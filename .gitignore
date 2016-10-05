@@ -1,6 +1,12 @@
 /Hardware/*
 
 /Software/*
-# !/Software/*.uvmpw
+!/Software/*.uvmpw
 
 !/Software/Common/
+
+!/Software/Project_nRF_ESB_SPI/
+/Software/Project_nRF_ESB_SPI/Outputs
+/Software/Project_nRF_ESB_SPI/JLink*
+/Software/Project_nRF_ESB_SPI/*.uvoptx
+/Software/Project_nRF_ESB_SPI/*.uvguix.*
