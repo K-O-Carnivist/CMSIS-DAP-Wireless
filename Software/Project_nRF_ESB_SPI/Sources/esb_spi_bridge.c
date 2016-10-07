@@ -1,26 +1,4 @@
-/* Copyright (c) 2014 Nordic Semiconductor. All Rights Reserved.
- *
- * The information contained herein is property of Nordic Semiconductor ASA.
- * Terms and conditions of usage are described in detail in NORDIC
- * SEMICONDUCTOR STANDARD SOFTWARE LICENSE AGREEMENT.
- *
- * Licensees are granted free, non-transferable use of the information. NO
- * WARRANTY of ANY KIND is provided. This heading must NOT be removed from
- * the file.
- *
- */
-
-#include <stdbool.h>
-#include <stdint.h>
-#include "sdk_common.h"
-#include "nrf.h"
 #include "nrf_esb.h"
-#include "nrf_error.h"
-#include "nrf_esb_error_codes.h"
-#include "nrf_delay.h"
-#include "nrf_gpio.h"
-#include "boards.h"
-#include "app_util.h"
 #include "nrf_drv_spi.h"
 #include "nrf_drv_spis.h"
 
@@ -35,6 +13,7 @@ typedef enum
 } TransferStatus_TypeDef;
 
 static volatile TransferStatus_TypeDef esb_tx_status;
+static volatile TransferStatus_TypeDef spi_tx_status;
 
 static uint32_t S2E_IndexI;
 static uint32_t S2E_IndexO;
@@ -45,17 +24,12 @@ static nrf_esb_payload_t tx_payload[ESB_PACKET_COUNT];
 static nrf_esb_payload_t rx_payload[ESB_PACKET_COUNT];
 uint8_t spi_temp_buffer[DAP_PACKET_SIZE];
 
-const uint8_t leds_list[LEDS_NUMBER] = LEDS_LIST;
-
 nrf_esb_config_t nrf_esb_config         = NRF_ESB_DEFAULT_CONFIG;
 
 #define SPI_INSTANCE  0 /**< SPI instance index. */
 static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);  /**< SPI instance. */
 #define SPIS_INSTANCE 1 /**< SPIS instance index. */
 static const nrf_drv_spis_t spis = NRF_DRV_SPIS_INSTANCE(SPIS_INSTANCE);/**< SPIS instance. */
-
-static volatile bool spi_xfer_done;  /**< Flag used to indicate that SPI instance completed the transfer. */
-static volatile bool spis_xfer_done; /**< Flag used to indicate that SPIS instance completed the transfer. */
 
 void nrf_esb_error_handler(uint32_t err_code, uint32_t line)
 {
@@ -67,20 +41,17 @@ void nrf_esb_error_handler(uint32_t err_code, uint32_t line)
 
 }
 
-/*lint -save -esym(40, BUTTON_1) -esym(40, BUTTON_2) -esym(40, BUTTON_3) -esym(40, BUTTON_4) -esym(40, LED_1) -esym(40, LED_2) -esym(40, LED_3) -esym(40, LED_4) */
-
 /**
  * @brief SPI user event handler.
  * @param event
  */
 void spi_event_handler(nrf_drv_spi_evt_t const * p_event)
 {
-    spi_xfer_done = true;
+    spi_tx_status = TX_IDLE;
 }
 
 /**
  * @brief SPIS user event handler.
- *
  * @param event
  */
 void spis_event_handler(nrf_drv_spis_event_t event)
@@ -89,14 +60,15 @@ void spis_event_handler(nrf_drv_spis_event_t event)
     {
         S2E_IndexI = (S2E_IndexI + 1) % ESB_PACKET_COUNT;
         nrf_drv_spis_buffers_set(&spis, spi_temp_buffer, DAP_PACKET_SIZE, tx_payload[S2E_IndexI].data, DAP_PACKET_SIZE);
-        spis_xfer_done = true;
     }
 }
 
+/**
+ * @brief ESB user event handler.
+ * @param event
+ */
 void nrf_esb_event_handler(nrf_esb_evt_t const * p_event)
 {
-    static int pkt_cnt = 0;
-    
     switch (p_event->evt_id)
     {
     case NRF_ESB_EVENT_TX_SUCCESS:
@@ -113,14 +85,6 @@ void nrf_esb_event_handler(nrf_esb_evt_t const * p_event)
             if(rx_payload[E2S_IndexI].length > 0)
             {
                 E2S_IndexI = (E2S_IndexI + 1) % ESB_PACKET_COUNT;
-                
-                pkt_cnt = (pkt_cnt + 1) % 4;
-                
-                // Set LEDs identical to the ones on the PTX.
-//                    nrf_gpio_pin_write(LED_1, pkt_cnt < 1);
-//                    nrf_gpio_pin_write(LED_2, pkt_cnt < 2);
-//                    nrf_gpio_pin_write(LED_3, pkt_cnt < 3);
-//                    nrf_gpio_pin_write(LED_4, pkt_cnt < 4);
             }
         }
         break;
@@ -134,13 +98,6 @@ void clocks_start( void )
     NRF_CLOCK->TASKS_HFCLKSTART = 1;
 
     while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0);
-}
-
-
-void gpio_init( void )
-{
-    nrf_gpio_range_cfg_output(8, 15);
-    LEDS_CONFIGURE(LEDS_MASK);
 }
 
 
@@ -185,8 +142,6 @@ int main(void)
     // (when the CPU is in sleep mode).
     NRF_POWER->TASKS_CONSTLAT = 1;
 
-    gpio_init();
-
     clocks_start();
 
     for (i = 0; i < ESB_PACKET_COUNT; i++)
@@ -218,11 +173,10 @@ int main(void)
     spis_config.csn_pin = 3;
     nrf_drv_spis_init(&spis, &spis_config, spis_event_handler);
 
-        nrf_drv_spis_buffers_set(&spis, spi_temp_buffer, DAP_PACKET_SIZE, tx_payload[S2E_IndexI].data, DAP_PACKET_SIZE);
+    nrf_drv_spis_buffers_set(&spis, spi_temp_buffer, DAP_PACKET_SIZE, tx_payload[S2E_IndexI].data, DAP_PACKET_SIZE);
 
-        spis_xfer_done = false;
     esb_tx_status = TX_IDLE;
-        spi_xfer_done = false;
+    spi_tx_status = TX_IDLE;
 
     while (true)
     {
@@ -253,9 +207,9 @@ int main(void)
             nrf_esb_start_rx();
         }
         
-        if (E2S_IndexI != E2S_IndexO)
+        if ((E2S_IndexI != E2S_IndexO) && (spi_tx_status == TX_IDLE))
         {
-            spi_xfer_done = false;
+            spi_tx_status = TX_BUSY;
 
             nrf_drv_spi_transfer(&spi, rx_payload[E2S_IndexO].data, DAP_PACKET_SIZE, spi_temp_buffer, DAP_PACKET_SIZE);
             E2S_IndexO = (E2S_IndexO + 1) % ESB_PACKET_COUNT;
