@@ -6,7 +6,13 @@
 !/Software/Common/
 
 !/Software/Project_nRF_ESB_SPI/
-/Software/Project_nRF_ESB_SPI/Outputs
-/Software/Project_nRF_ESB_SPI/JLink*
-/Software/Project_nRF_ESB_SPI/*.uvoptx
-/Software/Project_nRF_ESB_SPI/*.uvguix.*
+/Software/Project_nRF_ESB_SPI/*.*
+!/Software/Project_nRF_ESB_SPI/*.uvprojx
+/Software/Project_nRF_ESB_SPI/Outputs/*
+!/Software/Project_nRF_ESB_SPI/Outputs/*.hex
+
+!/Software/Project_STM32_HID/
+/Software/Project_STM32_HID/*.*
+!/Software/Project_STM32_HID/*.uvprojx
+/Software/Project_STM32_HID/Outputs/*
+!/Software/Project_STM32_HID/Outputs/*.hex

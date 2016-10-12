@@ -2,8 +2,7 @@
 #include "nrf_drv_spi.h"
 #include "nrf_drv_spis.h"
 
-#define ESB_PACKET_COUNT   4
-#define DAP_PACKET_SIZE   64
+#include "DAP_Common.h"
 
 typedef enum
 { 
